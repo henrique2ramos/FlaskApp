@@ -4,9 +4,7 @@ import pandas as pd
 import os
 
 app = Flask(__name__)
-
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DB_PATH = os.path.join(BASE_DIR, 'database.db')
+DB_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'database.db')
 
 def executar_query(sql, params=()):
     with sqlite3.connect(DB_PATH) as conn:
@@ -17,6 +15,11 @@ def executar_query(sql, params=()):
         conn.commit()
         return None
 
+@app.route('/')
+def home():
+    return jsonify({"status": "API Online", "rotas": ["/usuarios", "/instituicoes"]})
+
+
 @app.route('/usuarios', methods=['GET'])
 def listar_usuarios():
     df = executar_query("SELECT * FROM usuarios")
@@ -24,17 +27,11 @@ def listar_usuarios():
 
 @app.route('/usuarios', methods=['POST'])
 def criar_usuario():
-    dados = request.json
-    colunas = ', '.join(dados.keys())
-    placeholders = ', '.join(['?'] * len(dados))
-    sql = f"INSERT INTO usuarios ({colunas}) VALUES ({placeholders})"
-    executar_query(sql, list(dados.values()))
-    return jsonify({"status": "sucesso", "mensagem": "Usuario inserido"}), 201
+    d = request.json
+    sql = "INSERT INTO usuarios (nome, cpf, data_nascimento) VALUES (?, ?, ?)"
+    executar_query(sql, (d['nome'], d['cpf'], d.get('data_nascimento')))
+    return jsonify({"mensagem": "Usuário inserido com sucesso"}), 201
 
-@app.route('/usuarios/<int:id>', methods=['DELETE'])
-def deletar_usuario(id):
-    executar_query("DELETE FROM usuarios WHERE id = ?", (id,))
-    return jsonify({"status": "sucesso"}), 200
 
 @app.route('/instituicoes', methods=['GET'])
 def listar_instituicoes():
@@ -43,17 +40,20 @@ def listar_instituicoes():
 
 @app.route('/instituicoes', methods=['POST'])
 def criar_instituicao():
-    dados = request.json
-    colunas = ', '.join(dados.keys())
-    placeholders = ', '.join(['?'] * len(dados))
-    sql = f"INSERT INTO instituicoes ({colunas}) VALUES ({placeholders})"
-    executar_query(sql, list(dados.values()))
-    return jsonify({"status": "sucesso"}), 201
-
-@app.route('/instituicoes/<int:id>', methods=['DELETE'])
-def deletar_instituicao(id):
-    executar_query("DELETE FROM instituicoes WHERE id = ?", (id,))
-    return jsonify({"status": "sucesso"}), 200
+    d = request.json
+    sql = """INSERT INTO instituicoes 
+             (nome, co_municipio, qt_mat_bas, qt_mat_prof, qt_mat_eja, qt_mat_esp) 
+             VALUES (?, ?, ?, ?, ?, ?)"""
+    params = (
+        d['nome'], 
+        d.get('co_municipio'), 
+        d.get('qt_mat_bas', 0), 
+        d.get('qt_mat_prof', 0), 
+        d.get('qt_mat_eja', 0), 
+        d.get('qt_mat_esp', 0)
+    )
+    executar_query(sql, params)
+    return jsonify({"mensagem": "Instituição inserida com sucesso"}), 201
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True)
